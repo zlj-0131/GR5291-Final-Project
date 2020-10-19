@@ -25,9 +25,13 @@ library(tidyr)
 library(tidyverse)
 library(dplyr)
 library(mlbench)
+library(ggplot2)
+library(randomForest)
+library(caret)
+library(reshape2)
 
 # Load the dataset
-df <- read.csv("D:/Columbia University/GR5291-Final-Project/data/NFWBS_PUF_2016_data.csv")
+df <- read.csv("D:/Columbia University/GR 5291/GR5291-Final-Project/data/NFWBS_PUF_2016_data.csv")
 head(df)
 
 ```
@@ -55,33 +59,13 @@ sapply(df, class)
 
 ```
 
-## Correlation matrix
-
-```{r}
-
-# calculate correlation matrix
-correlationMatrix <- cor(df)
-
-# summarize the correlation matrix
-print(correlationMatrix)
-
-# find attributes that are highly corrected (ideally >0.75)
-highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5)
-
-# print indexes of highly correlated attributes
-print(highlyCorrelated)
-
-```
-
 ## Feature Importance Method
 
 ```{r}
 
-library(randomForest)
-library(caret)
-
 # Fit random forest to the dataset
 fit <- randomForest(HEALTH~., data=df)
+
 ```
 
 ```{r}
@@ -107,7 +91,63 @@ new_df <- df[column_keep]
 head(new_df)
 
 # Export to csv
-write.csv(new_df,"D:/Columbia University/GR5291-Final-Project/data/Feature_selection_data.csv", row.names = FALSE)
+write.csv(new_df,"D:/Columbia University/GR 5291/GR5291-Final-Project/data/Feature_selection_data.csv", row.names = FALSE)
+
+```
+
+## Correlation matrix
+
+```{r}
+
+# calculate correlation matrix
+correlationMatrix <- cor(new_df)
+
+# find attributes that are highly corrected (ideally >0.75)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5)
+
+# print indexes of highly correlated attributes
+print(highlyCorrelated)
+
+cormat <- round(correlationMatrix,2)
+
+# reorder the correlation matrix helper function
+reorder_cormat <- function(cormat){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <- cormat[hc$order, hc$order]
+}
+
+# Get lower triangle of the correlation matrix
+  get_lower_tri<-function(cormat){
+    cormat[upper.tri(cormat)] <- NA
+    return(cormat)
+  }
+# Get upper triangle of the correlation matrix
+  get_upper_tri <- function(cormat){
+    cormat[lower.tri(cormat)]<- NA
+    return(cormat)
+  }
+
+# Reorder the correlation matrix
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+
+# Melt the correlation matrix
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+# Construct a heatmap of the dataset
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()
+# Print the heatmap
+print(ggheatmap)
 
 ```
 
