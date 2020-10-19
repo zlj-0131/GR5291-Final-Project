@@ -1,0 +1,114 @@
+---
+title: "G5291 Final PROJECT"
+author: "Lingjia Zhang"
+date: "10/19/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Exploratory Data Analysis
+
+
+
+
+
+
+
+#### Feature Selection
+
+```{r}
+# Load libraries
+library(tidyr)
+library(tidyverse)
+library(dplyr)
+library(mlbench)
+
+# Load the dataset
+df <- read.csv("D:/Columbia University/GR5291-Final-Project/data/NFWBS_PUF_2016_data.csv")
+head(df)
+
+```
+
+```{r}
+
+# Show dimension of the dataframe 
+dim(df)
+
+# Set PUF_ID as index
+df <- df %>%
+  remove_rownames %>% 
+  column_to_rownames(var="PUF_ID")
+
+head(df)
+
+# Check NA values
+colSums(is.na(df))
+
+```
+
+```{r}
+
+sapply(df, class)
+
+```
+
+## Correlation matrix
+
+```{r}
+
+# calculate correlation matrix
+correlationMatrix <- cor(df)
+
+# summarize the correlation matrix
+print(correlationMatrix)
+
+# find attributes that are highly corrected (ideally >0.75)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5)
+
+# print indexes of highly correlated attributes
+print(highlyCorrelated)
+
+```
+
+## Feature Importance Method
+
+```{r}
+
+library(randomForest)
+library(caret)
+
+# Fit random forest to the dataset
+fit <- randomForest(HEALTH~., data=df)
+```
+
+```{r}
+# Show the variable importance table
+vi <- varImp(fit, scale = FALSE)
+vi <- rownames_to_column(vi, "features")
+vi[order(-vi$Overall),]
+
+# Plot the variable importance
+varImpPlot(fit,type=2)
+
+```
+
+```{r}
+
+# Determine 20 most importanct features
+selected_features <- vi$features[1:20]
+
+# Generate new dataset
+column_keep <- c("HEALTH", selected_features)
+new_df <- df[column_keep]
+
+head(new_df)
+
+# Export to csv
+write.csv(new_df,"D:/Columbia University/GR5291-Final-Project/data/Feature_selection_data.csv", row.names = FALSE)
+
+```
+
+
