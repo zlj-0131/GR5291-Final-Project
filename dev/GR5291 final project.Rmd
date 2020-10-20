@@ -31,7 +31,7 @@ library(caret)
 library(reshape2)
 
 # Load the dataset
-df <- read.csv("D:/Columbia University/GR 5291/GR5291-Final-Project/data/NFWBS_PUF_2016_data.csv")
+df <- read.csv("../data/NFWBS_PUF_2016_data.csv")
 head(df)
 
 ```
@@ -91,7 +91,7 @@ new_df <- df[column_keep]
 head(new_df)
 
 # Export to csv
-write.csv(new_df,"D:/Columbia University/GR 5291/GR5291-Final-Project/data/Feature_selection_data.csv", row.names = FALSE)
+write.csv(new_df,"../data/Feature_selection_data.csv", row.names = FALSE)
 
 ```
 
@@ -137,14 +137,16 @@ upper_tri <- get_upper_tri(cormat)
 melted_cormat <- melt(upper_tri, na.rm = TRUE)
 
 # Construct a heatmap of the dataset
+text_size = 2
 ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
  geom_tile(color = "white")+
+  geom_text(aes(label = round(value, 1)), size = text_size) + 
  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
    midpoint = 0, limit = c(-1,1), space = "Lab", 
     name="Pearson\nCorrelation") +
   theme_minimal()+ # minimal theme
- theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-    size = 12, hjust = 1))+
+ theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1),
+    text = element_text(size = text_size * (5))) +
  coord_fixed()
 # Print the heatmap
 print(ggheatmap)
