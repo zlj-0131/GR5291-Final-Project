@@ -1,0 +1,171 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+<!-- This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.  -->
+
+<!-- Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*.  -->
+
+<!-- ```{r} -->
+<!-- plot(cars) -->
+<!-- ``` -->
+
+<!-- Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*. -->
+
+<!-- When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).  -->
+
+<!-- The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed. -->
+
+# Load Libraries and data
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+library(glmnet)
+library(ggplot2)
+library(tidyverse)
+library(bnstruct)
+library(MASS)
+library(caret)
+
+data = read_csv("../data/NFWBS_PUF_2016_data.csv")
+head(data)
+
+```
+
+
+# Data Cleaning
+
+```{r}
+data <- data %>%
+  remove_rownames %>% 
+  column_to_rownames(var="PUF_ID")
+
+# notice that negative values are invalid entries, 
+# so replacing them with NA
+for (i in 1:nrow(data)){
+  for (j in 1:ncol(data)){
+    if (data[i,j] < 0){
+      data[i,j] = NA
+    }
+  }
+}
+```
+
+
+```{r, eval=FALSE, include=FALSE, echo=FALSE, message=FALSE}
+# number of na values in row and column
+nacol = colSums(is.na(data))
+mean(nacol); sd(nacol)
+
+narow = rowSums(is.na(data))
+mean(narow); sd(narow)
+
+```
+
+```{r}
+# use knn impute to resolve NA problem
+cleandata = knn.impute(as.matrix(data)) %>% 
+  as.data.frame()
+rownames(cleandata) = rownames(data)
+colnames(cleandata) = colnames(data)
+colSums(is.na(cleandata)) %>% mean
+```
+
+
+# Regression using LASSO with 80/20 Train/Test data split
+
+```{r}
+
+inpt = cleandata[, -which(colnames(cleandata) == "HEALTH")]
+resp = cleandata$HEALTH
+# separation of train and test data
+testind = sample(1:nrow(cleandata), round(nrow(cleandata) * 0.2), replace = F)
+train.x = inpt[-testind, ]
+test.x = inpt[testind, ]
+train.y = resp[-testind]
+test.y = resp[testind]
+
+# train LASSO regression
+cv <- cv.glmnet(x = as.matrix(train.x), y = as.double(train.y), 
+               family="gaussian", alpha = 1, intercept=TRUE)
+bestlambda <- cv$lambda.min
+lasso <- glmnet(x = as.matrix(train.x), y = as.double(train.y), 
+               family="gaussian", alpha = 1, intercept=TRUE, lambda = bestlambda)
+
+summary(lasso)
+
+coef = rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>% 
+  dplyr::arrange(desc(s0)) %>% filter(s0 != 0)
+
+coef
+
+```
+
+
+```{r, include=FALSE,eval=FALSE, echo=FALSE, message=FALSE}
+# Show the variable importance table
+importance = dplyr::arrange(coef, desc(abs(s0)))
+importance
+
+# select top 20 important variables
+selectedvar = rownames(importance)[2:21]
+
+```
+
+# Test Regression Result
+
+```{r}
+pred = predict(lasso, newx = as.matrix(test.x))
+
+mean((test.y - pred)^2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
