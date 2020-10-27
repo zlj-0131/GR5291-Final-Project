@@ -1,0 +1,96 @@
+---
+title: "Decision Tree and Random Forest"
+author: "Candy Li"
+date: "10/27/2020"
+output: pdf_document
+---
+
+### Load data
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+library(bnstruct)
+library(tree)
+library(randomForest)
+data = read_csv("../data/NFWBS_PUF_2016_data.csv")
+head(data)
+```
+
+```{r}
+data <- data %>%
+  remove_rownames %>% 
+  column_to_rownames(var="PUF_ID")
+
+# notice that negative values are invalid entries, 
+# so replacing them with NA
+for (i in 1:nrow(data)){
+  for (j in 1:ncol(data)){
+    if (data[i,j] < 0){
+      data[i,j] = NA
+    }
+  }
+}
+```
+
+```{r eval=FALSE, include=FALSE, echo=FALSE, message=FALSE}
+# number of na values in row and column
+nacol = colSums(is.na(data))
+mean(nacol); sd(nacol)
+
+narow = rowSums(is.na(data))
+mean(narow); sd(narow)
+```
+
+```{r}
+# use knn impute to resolve NA problem
+cleandata = knn.impute(as.matrix(data)) %>% 
+  as.data.frame()
+rownames(cleandata) = rownames(data)
+colnames(cleandata) = colnames(data)
+colSums(is.na(cleandata)) %>% mean
+```
+
+```{r}
+inpt = cleandata[, -which(colnames(cleandata) == "HEALTH")]
+resp = cleandata$HEALTH
+# separation of train and test data
+testind = sample(1:nrow(cleandata), round(nrow(cleandata) * 0.2), replace = F)
+train = cleandata[-testind, ]
+test.x = inpt[testind, ]
+test.y = resp[testind]
+```
+
+### Decision Tree
+
+```{r}
+fit.tree <- tree(HEALTH ~ ., data = train)
+summary(fit.tree)
+```
+
+```{r fig.width=13, fig.height=7}  
+plot(fit.tree)
+text(fit.tree, pretty = 1)
+```
+
+#### True Error
+
+```{r}
+pred.tree <- predict(fit.tree, newdata = test.x)
+mean((test.y - pred.tree)^2)
+```
+
+### Random Forest
+
+```{r warning=FALSE}
+fit.rf <- randomForest(HEALTH ~ ., data = train, mtry = round(sqrt(ncol(train)-1)), 
+                       importance = TRUE, ntree = 10)
+summary(fit.rf)
+```
+
+#### True Error
+
+```{r}
+pred.rf <- predict(fit.rf, newdata = test.x)
+mean((test.y - pred.rf)^2)
+```
