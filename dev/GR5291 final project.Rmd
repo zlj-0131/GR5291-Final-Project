@@ -201,6 +201,11 @@ write.csv(new_df, "../data/Feature_selection_data.csv", row.names = FALSE)
 # Imbalance Data
 
 as.data.frame(table(new_df$HEALTH))
+
+```
+
+
+```{r}
 new_df <- new_df %>% 
   mutate(HEALTH = as.factor(HEALTH))
 
@@ -210,6 +215,9 @@ library(DMwR)
 balanced_df <- SMOTE(HEALTH~., new_df, perc.over = 500, perc.under = 115, k = 5)
 as.data.frame(table(balanced_df$HEALTH))
 
+```
+
+```{r}
 # Export to csv
 write.csv(balanced_df, "../data/balance_data.csv", row.names = FALSE)
 
