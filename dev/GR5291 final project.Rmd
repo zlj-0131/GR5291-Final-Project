@@ -51,6 +51,9 @@ head(df)
 # Check NA values
 colSums(is.na(df))
 
+df <- df %>%
+  mutate(HEALTH = ifelse(HEALTH == -1 | HEALTH == 1 | HEALTH == 2, 0, 1))
+
 ```
 
 ```{r}
@@ -152,5 +155,72 @@ ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
 print(ggheatmap)
 
 ```
+
+```{r}
+
+library(lares)
+
+corr_cross(new_df, # name of dataset
+  max_pvalue = 0.05, # display only significant correlations (at 5% level)
+  top = 10 # display top 10 couples of variables (by correlation coefficient)
+)
+
+```
+
+```{r}
+
+library(Information)
+library(gridExtra)
+
+### Ranking variables using penalized IV  
+IV <- create_infotables(data = new_df, y = "HEALTH", bins=10, parallel=TRUE)
+
+IV_Value = data.frame(IV$Summary)
+
+IV_Value
+
+```
+
+```{r}
+
+new_df <- subset(new_df, select = -c(FS1_1, FWB2_1, FWB1_3))
+
+dim(new_df)
+
+```
+
+```{r}
+
+# Export to csv
+write.csv(new_df, "../data/Feature_selection_data.csv", row.names = FALSE)
+
+```
+
+```{r}
+
+# Imbalance Data
+
+as.data.frame(table(new_df$HEALTH))
+new_df <- new_df %>% 
+  mutate(HEALTH = as.factor(HEALTH))
+
+# SMOTE : : Synthetic Minority Oversampling Technique To Handle Class Imbalancy In Binary Classification
+library(DMwR)
+
+balanced_df <- SMOTE(HEALTH~., new_df, perc.over = 500, perc.under = 115, k = 5)
+as.data.frame(table(balanced_df$HEALTH))
+
+# Export to csv
+write.csv(balanced_df, "../data/balance_data.csv", row.names = FALSE)
+
+```
+
+
+
+
+
+
+
+
 
 
