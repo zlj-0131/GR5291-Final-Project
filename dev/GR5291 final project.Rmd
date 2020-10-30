@@ -29,6 +29,8 @@ library(ggplot2)
 library(randomForest)
 library(caret)
 library(reshape2)
+library(bnstruct)
+library(glmnet)
 
 # Load the dataset
 df <- read.csv("../data/NFWBS_PUF_2016_data.csv")
@@ -78,12 +80,6 @@ colSums(is.na(df))
 
 df <- df %>%
   mutate(HEALTH = ifelse(HEALTH == -1 | HEALTH == 1 | HEALTH == 2, 0, 1))
-
-```
-
-```{r}
-
-sapply(df, class)
 
 ```
 
@@ -223,14 +219,34 @@ write.csv(new_df, "../data/Feature_selection_data.csv", row.names = FALSE)
 
 ```{r}
 
-# Imbalance Data
-
 new_df <- new_df %>% 
   mutate(HEALTH = as.factor(HEALTH))
 
-as.data.frame(table(new_df$HEALTH))
+# Train / Test dataset split
 
-ggplot(new_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(new_df))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(new_df)), size = smp_size)
+
+train_df <- new_df[train_ind, ]
+test_df <- new_df[-train_ind, ]
+
+# Export to csv
+write.csv(train_df, "../data/train_data.csv", row.names = FALSE)
+write.csv(test_df, "../data/test_data.csv", row.names = FALSE)
+
+```
+
+```{r}
+
+# Imbalance Data
+
+as.data.frame(table(train_df$HEALTH))
+
+ggplot(train_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
   geom_bar() + 
   xlab("Healthy OR Not") +
   labs(fill="Healthy OR Not")
@@ -239,16 +255,14 @@ ggplot(new_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +
 
 
 ```{r}
-new_df <- new_df %>% 
-  mutate(HEALTH = as.factor(HEALTH))
 
 # SMOTE : : Synthetic Minority Oversampling Technique To Handle Class Imbalancy In Binary Classification
 library(DMwR)
 
-balanced_df <- SMOTE(HEALTH~., new_df, perc.over = 500, perc.under = 115, k = 5)
+train_balanced_df <- SMOTE(HEALTH~., new_df, perc.over = 500, perc.under = 115, k = 5)
 as.data.frame(table(balanced_df$HEALTH))
 
-ggplot(balanced_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
+ggplot(train_balanced_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
   geom_bar() + 
   xlab("Healthy OR Not") +
   labs(fill="Healthy OR Not")
@@ -256,11 +270,11 @@ ggplot(balanced_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +
 ```
 
 ```{r}
+
 # Export to csv
-write.csv(balanced_df, "../data/balance_data.csv", row.names = FALSE)
+write.csv(balanced_df, "../data/train_balanced_data.csv", row.names = FALSE)
 
 ```
-
 
 
 
