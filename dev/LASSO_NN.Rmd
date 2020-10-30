@@ -1,0 +1,76 @@
+---
+title: "LASSO_NN"
+author: "Cavalry"
+date: "10/29/2020"
+output: pdf_document
+---
+
+```{r}
+library(readr)
+library(caret)
+source("./LASSO_NN.R")
+```
+
+```{r}
+datatrain = read_csv("../data/train_balanced_data.csv")
+datatest = read_csv("../data/test_data.csv")
+
+trainx = datatrain[,-1]
+trainy = datatrain$HEALTH
+testx = datatest[, -1]
+testy = datatest$HEALTH
+
+```
+
+```{r}
+
+lasso = lassoReg(trainx, trainy)
+
+coef = rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>% 
+  dplyr::arrange(desc(abs(s0))) %>% rename(Coef = s0)
+
+coef
+
+pred = lassoPred(lasso, testx)
+
+mean((pred - testy)^2)
+
+confusionMatrix(factor(round(pred)), factor(testy))$byClass
+
+```
+
+
+```{r}
+
+nnfit = nnReg(datatrain)
+
+plot(nnfit)
+
+```
+
+```{r}
+
+pred_nn = nnPred(nnfit, testx)
+
+confusionMatrix(factor(round(pred)), factor(testy))$byClass
+```
+
+
+
+```{r}
+
+nbfit = nbReg(datatrain)
+
+nbpred = predict(nbfit, testx)
+
+mean((as.numeric(nbpred)-1 - testy)^2)
+
+confusionMatrix(nbpred, factor(testy))$byClass
+
+```
+
+
+
+
+
+
