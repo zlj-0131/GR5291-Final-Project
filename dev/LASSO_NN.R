@@ -23,9 +23,10 @@ lassoPred = function(model, test.x){
 nnReg = function(train_df){
   nn.fit = neuralnet(data = train_df,
                      formula = factor(HEALTH) ~ . ,
-                     hidden = 10,
+                     hidden = c(8,4),
                      act.fct = "logistic",
-                     threshold = 1,
+                     threshold = 0.1,
+                     stepmax = 1e06,
                      linear.output = F)
   return(nn.fit)
 }

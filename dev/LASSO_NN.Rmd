@@ -25,6 +25,7 @@ testy = datatest$HEALTH
 ```{r}
 
 lasso = lassoReg(trainx, trainy)
+summary(lasso)
 
 coef = rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>% 
   dplyr::arrange(desc(abs(s0))) %>% rename(Coef = s0)
@@ -52,7 +53,7 @@ plot(nnfit)
 
 pred_nn = nnPred(nnfit, testx)
 
-confusionMatrix(factor(round(pred)), factor(testy))$byClass
+confusionMatrix(factor(round(pred_nn)-1), factor(testy))$byClass
 ```
 
 
