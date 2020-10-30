@@ -46,6 +46,31 @@ df <- df %>%
   remove_rownames %>% 
   column_to_rownames(var="PUF_ID")
 
+# notice that negative values are invalid entries, 
+# so replacing them with NA
+for (i in 1:nrow(df)){
+  for (j in 1:ncol(df)){
+    if (df[i,j] < 0){
+      df[i,j] = NA
+    }
+  }
+}
+```
+
+```{r eval=FALSE, include=FALSE, echo=FALSE, message=FALSE}
+# number of na values in row and column
+nacol = colSums(is.na(df))
+mean(nacol); sd(nacol)
+
+narow = rowSums(is.na(df))
+mean(narow); sd(narow)
+```
+
+```{r}
+# use knn impute to resolve NA problem
+df = knn.impute(as.matrix(df)) %>% 
+  as.data.frame()
+
 head(df)
 
 # Check NA values
@@ -106,7 +131,7 @@ write.csv(new_df,"../data/Feature_selection_data.csv", row.names = FALSE)
 correlationMatrix <- cor(new_df)
 
 # find attributes that are highly corrected (ideally >0.75)
-highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.5)
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
 
 # print indexes of highly correlated attributes
 print(highlyCorrelated)
@@ -200,7 +225,15 @@ write.csv(new_df, "../data/Feature_selection_data.csv", row.names = FALSE)
 
 # Imbalance Data
 
+new_df <- new_df %>% 
+  mutate(HEALTH = as.factor(HEALTH))
+
 as.data.frame(table(new_df$HEALTH))
+
+ggplot(new_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
+  geom_bar() + 
+  xlab("Healthy OR Not") +
+  labs(fill="Healthy OR Not")
 
 ```
 
@@ -214,6 +247,11 @@ library(DMwR)
 
 balanced_df <- SMOTE(HEALTH~., new_df, perc.over = 500, perc.under = 115, k = 5)
 as.data.frame(table(balanced_df$HEALTH))
+
+ggplot(balanced_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +  
+  geom_bar() + 
+  xlab("Healthy OR Not") +
+  labs(fill="Healthy OR Not")
 
 ```
 
