@@ -9,18 +9,22 @@ output: pdf_document
 library(readr)
 library(caret)
 source("./LASSO_NN.R")
+source("./svm.R")
 ```
 
 ```{r}
 datatrain = read_csv("../data/train_balanced_data.csv")
 datatest = read_csv("../data/test_data.csv")
 
-trainx = datatrain[,-1]
+location = which(colnames(datatrain) == "HEALTH")
+trainx = datatrain[,-location]
 trainy = datatrain$HEALTH
-testx = datatest[, -1]
+testx = datatest[, -location]
 testy = datatest$HEALTH
 
 ```
+
+## LASSO method
 
 ```{r}
 
@@ -33,13 +37,66 @@ coef = rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>%
 coef
 
 pred = lassoPred(lasso, testx)
+pred <- ifelse(pred > mean(pred), 1, 0)
 
 mean((pred - testy)^2)
 
-confusionMatrix(factor(round(pred)), factor(testy))$byClass
+confusionMatrix(factor(pred), factor(testy))$byClass
+
+tpr.fpr <- WeightedROC(pred, testy, weight_test)
+auc.log <- WeightedAUC(tpr.fpr)
+auc.log
 
 ```
 
+## SVM
+
+```{r}
+source("./svm.R")
+# Tune SVM
+set.seed(2020)
+opt.svm <- svm_tune(scale(as.matrix(trainx)), trainy)
+bestgamma = opt.svm$best.parameters$gamma
+bestcost = opt.svm$best.parameters$cost
+
+# tune svm is very time consuming, takes about 5 hours to run
+# tuned result is gamma=0.01, cost = 0.11
+bestgamma; bestcost
+
+# Train SVM
+svm_fit <- svm_train(scale(as.matrix(trainx)), trainy, 0.01, 0.11)
+
+```
+
+###### Step 5.1(b): Test SVM with with tuning parameters
+```{r}
+
+
+svm_pred <- svm_test(svm_fit, scale(as.matrix(testx)))
+
+svm.pred <- ifelse(svm_pred > mean(svm_pred), 1, 0)
+# Calculate Accuracy
+mean((svm.pred-testy)^2)
+
+confusionMatrix(factor(svm.pred), factor(testy))$byClass
+
+
+weight_test <- rep(NA, length(testy))
+for (v in unique(testy)){
+  weight_test[testy == v] = 0.5 * length(testy) / length(testy[testy == v])
+}
+
+
+library(WeightedROC)
+tpr.fpr <- WeightedROC(svm.pred, testy, weight_test)
+auc.svm <- WeightedAUC(tpr.fpr)
+auc.svm
+
+```
+
+
+
+## Neural Net
 
 ```{r}
 
