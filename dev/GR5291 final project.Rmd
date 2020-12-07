@@ -9,14 +9,6 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-#### Exploratory Data Analysis
-
-
-
-
-
-
-
 #### Feature Selection
 
 ```{r}
@@ -83,99 +75,7 @@ df <- df %>%
 
 ```
 
-## Feature Importance Method
 
-```{r}
-
-# Fit random forest to the dataset
-fit <- randomForest(HEALTH~., data=df)
-
-```
-
-```{r}
-# Show the variable importance table
-vi <- varImp(fit, scale = FALSE)
-vi <- rownames_to_column(vi, "features")
-vi[order(-vi$Overall),]
-
-# Plot the variable importance
-varImpPlot(fit,type=2)
-
-```
-
-```{r}
-
-# Determine 20 most important features
-selected_features <- vi$features[1:50]
-
-# Generate new dataset
-column_keep <- c("HEALTH", selected_features)
-new_df <- df[column_keep]
-
-head(new_df)
-
-# Export to csv
-write.csv(new_df,"../data/Feature_selection_data.csv", row.names = FALSE)
-
-```
-
-## Correlation matrix
-
-```{r}
-
-# calculate correlation matrix
-correlationMatrix <- cor(new_df)
-
-# find attributes that are highly corrected (ideally > 0.75)
-highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
-
-# print indexes of highly correlated attributes
-print(highlyCorrelated)
-
-cormat <- round(correlationMatrix,2)
-
-# reorder the correlation matrix helper function
-reorder_cormat <- function(cormat){
-  # Use correlation between variables as distance
-  dd <- as.dist((1-cormat)/2)
-  hc <- hclust(dd)
-  cormat <- cormat[hc$order, hc$order]
-}
-
-# Get lower triangle of the correlation matrix
-  get_lower_tri<-function(cormat){
-    cormat[upper.tri(cormat)] <- NA
-    return(cormat)
-  }
-# Get upper triangle of the correlation matrix
-  get_upper_tri <- function(cormat){
-    cormat[lower.tri(cormat)]<- NA
-    return(cormat)
-  }
-
-# Reorder the correlation matrix
-cormat <- reorder_cormat(cormat)
-upper_tri <- get_upper_tri(cormat)
-
-# Melt the correlation matrix
-melted_cormat <- melt(upper_tri, na.rm = TRUE)
-
-# Construct a heatmap of the dataset
-text_size = 2
-ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
- geom_tile(color = "white")+
-  geom_text(aes(label = round(value, 1)), size = text_size) + 
- scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-   midpoint = 0, limit = c(-1,1), space = "Lab", 
-    name="Pearson\nCorrelation") +
-  theme_minimal()+ # minimal theme
- theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1),
-    text = element_text(size = text_size * (5))) +
- coord_fixed()
-# Print the heatmap
-print(ggheatmap)
-
-```
 
 ```{r}
 
@@ -201,31 +101,6 @@ write.csv(test_df, "../data/test_data.csv", row.names = FALSE)
 ```
 
 ```{r}
-# Feature Selection Dataset
-new_df <- new_df %>% 
-  mutate(HEALTH = as.factor(HEALTH))
-
-# Train / Test dataset split
-
-## 75% of the sample size
-smp_size <- floor(0.75 * nrow(df))
-
-## set the seed to make your partition reproducible
-set.seed(123)
-train_ind <- sample(seq_len(nrow(new_df)), size = smp_size)
-
-feature_train_df <- new_df[train_ind, ]
-feature_test_df <- new_df[-train_ind, ]
-
-# Export to csv
-write.csv(feature_train_df, "../data/feature_train_data.csv", row.names = FALSE)
-write.csv(feature_test_df, "../data/feature_test_data.csv", row.names = FALSE)
-
-
-```
-
-
-```{r}
 
 # Imbalance Data
 
@@ -245,7 +120,6 @@ ggplot(train_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +
 library(DMwR)
 
 train_balanced_df <- SMOTE(HEALTH~., train_df, perc.over = 500, perc.under = 115, k = 5)
-feature_train_balanced_df <- SMOTE(HEALTH~., feature_train_df, perc.over = 500, perc.under = 115, k = 5)
 
 as.data.frame(table(train_balanced_df$HEALTH))
 
@@ -260,7 +134,6 @@ ggplot(train_balanced_df , aes(x = factor(HEALTH), fill = factor(HEALTH))) +
 
 # Export to csv
 write.csv(train_balanced_df, "../data/train_balanced_data.csv", row.names = FALSE)
-write.csv(feature_train_balanced_df, "../data/feature_train_balanced_data.csv", row.names = FALSE)
 
 ```
 
