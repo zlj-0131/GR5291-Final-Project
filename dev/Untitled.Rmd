@@ -1,0 +1,65 @@
+---
+title: "Untitled"
+author: "Depeng Kong (dk3112)"
+date: "12/5/2020"
+output: pdf_document
+---
+
+### Load data
+
+```{r message=FALSE, warning=FALSE}
+library(readr)
+library(tidyverse)
+library(bnstruct)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(randomForest)
+library(xgboost)
+library(pROC)
+train = read_csv("../data/train_balanced_data.csv")
+test = read_csv("../data/test_data.csv")
+```
+
+### Decision Tree
+
+```{r}
+fit.tree <- rpart(HEALTH ~ ., data = train, method = "class")
+summary(fit.tree)
+rpart.plot(fit.tree)
+# Test Error
+pred.tree <- predict(fit.tree, newdata = test, type = "class")
+mean((test$HEALTH != pred.tree)^2)
+# AUC
+auc(test$HEALTH, as.numeric(pred.tree)-1)
+```
+
+### Random Forest
+
+```{r warning=FALSE}
+fit.rf <- randomForest(as.factor(HEALTH) ~ ., data = train,
+                       importance = TRUE, ntree = 100)
+summary(fit.rf)
+# Test Error
+pred.rf <- predict(fit.rf, newdata = test)
+mean((test$HEALTH != pred.rf)^2)
+# AUC
+auc(test$HEALTH, as.numeric(pred.rf)-1)
+```
+
+### XGBoost
+
+```{r}
+train.data <- as.matrix(train[,names(train)!="HEALTH"])
+test.data <- as.matrix(test[,names(train)!="HEALTH"])
+xgb.train = xgb.DMatrix(data = train.data, label = train$HEALTH)
+xgb.test = xgb.DMatrix(data = test.data, label = test$HEALTH)
+fit.xgboost <- xgboost(data = xgb.train, nrounds = 100,
+                       objective = "binary:logistic")
+# Test Error
+pred.xgboost <- predict(fit.xgboost, xgb.test)
+mean((test$HEALTH != as.numeric(pred.xgboost > 0.5))^2)
+# AUC
+pred.xgboost.class <- as.numeric(pred.xgboost > 0.5)
+auc(test$HEALTH, pred.xgboost.class)
+```

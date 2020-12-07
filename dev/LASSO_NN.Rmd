@@ -1,134 +1,185 @@
 ---
-title: "LASSO_NN"
-author: "Cavalry"
+title: "Methods"
+author: "Group 17"
 date: "10/29/2020"
 output: pdf_document
 ---
 
-```{r}
+## Load Libraries
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
 library(readr)
 library(caret)
-source("./LASSO_NN.R")
-source("./svm.R")
+library(bnstruct)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(randomForest)
+library(xgboost)
+library(pROC)
+library(e1071)
+library(glmnet)
+library(neuralnet)
+library(e1071)
+```
+
+
+## Load Data
+```{r warning=FALSE}
+datatrain <- read_csv("../data/train_balanced_data.csv")
+datatest <- read_csv("../data/test_data.csv")
+
+location <- which(colnames(datatrain) == "HEALTH")
+trainx <- datatrain[,-location]
+trainy <- datatrain$HEALTH
+testx <- datatest[, -location]
+testy <- datatest$HEALTH
+```
+
+
+## Model 2: LASSO method
+
+```{r}
+# Define Functions
+lassoReg = function(train.x, train.y){
+  set.seed(2020)
+  cv <- cv.glmnet(x = as.matrix(train.x), y = train.y, nfolds = 50,
+                  family="binomial", alpha = 1, intercept=TRUE)
+  bestlambda <- cv$lambda.min
+  lasso <- glmnet(x = as.matrix(train.x), y = train.y,
+                  family="binomial", alpha = 1, intercept=TRUE, lambda = bestlambda)
+  return(lasso)
+}
+
+lassoPred = function(model, test.x){
+  return(predict(model, as.matrix(test.x)))
+}
 ```
 
 ```{r}
-datatrain = read_csv("../data/train_balanced_data.csv")
-datatest = read_csv("../data/test_data.csv")
+# Tune and Train LASSO
+lasso <- lassoReg(trainx, trainy)
 
-location = which(colnames(datatrain) == "HEALTH")
-trainx = datatrain[,-location]
-trainy = datatrain$HEALTH
-testx = datatest[, -location]
-testy = datatest$HEALTH
-
-```
-
-## LASSO method
-
-```{r}
-
-lasso = lassoReg(trainx, trainy)
-summary(lasso)
-
-coef = rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>% 
+# Coefficients
+rbind("(intercept)" = lasso$a0, as.data.frame(as.matrix(lasso$beta))) %>%
   dplyr::arrange(desc(abs(s0))) %>% rename(Coef = s0)
 
-coef
-
-pred = lassoPred(lasso, testx)
+# LASSO Test
+pred <- lassoPred(lasso, testx)
 pred <- ifelse(pred > mean(pred), 1, 0)
 
-mean((pred - testy)^2)
-
-confusionMatrix(factor(pred), factor(testy))$byClass
-
-tpr.fpr <- WeightedROC(pred, testy, weight_test)
-auc.log <- WeightedAUC(tpr.fpr)
-auc.log
-
+# Conclude LASSO
+# AUC
+lasso.auc <- auc(testy, pred)
+# Output
+cat("AUC for LASSO is ", lasso.auc, sep = "")
 ```
 
-## SVM
+
+## Model 3: Support Vector Machine
 
 ```{r}
-source("./svm.R")
+# Define Functions 
+svm_tune <- function(mat.x, y){
+  set.seed(2020)
+  return(
+    tune(method = svm,
+         train.x = mat.x,
+         train.y = factor(y),
+         kernel = "linear",
+         ranges = list(
+           gamma = seq(0.001, 0.021, 0.005),
+           cost = seq(0.01, 0.21, 0.1)
+         ))
+  )
+}
+
+svm_train <- function(mat.x, y, opt.gamma, opt.cost){
+  set.seed(2020)
+  return(
+    svm (x = mat.x,
+         y = y,
+         scale = F,
+         gamma = opt.gamma,
+         cost = opt.cost,
+         kernel = "linear",
+         cross = 10
+    )
+  )
+}
+
+svm_test <- function(model, test.matx){
+  test.x <- test.matx
+  set.seed(2020)
+  return(
+    predict(model, test.x, type = "response")
+  )
+}
+```
+
+```{r}
 # Tune SVM
-set.seed(2020)
 opt.svm <- svm_tune(scale(as.matrix(trainx)), trainy)
 bestgamma = opt.svm$best.parameters$gamma
 bestcost = opt.svm$best.parameters$cost
 
-# tune svm is very time consuming, takes about 5 hours to run
-# tuned result is gamma=0.01, cost = 0.11
-bestgamma; bestcost
-
-# Train SVM
-svm_fit <- svm_train(scale(as.matrix(trainx)), trainy, 0.01, 0.11)
-
+# Output tuned parameters
+cat("Best gamma for SVM is ", bestgamma, ", best cost for SVM is ", bestcost, ".", sep = "")
 ```
 
-###### Step 5.1(b): Test SVM with with tuning parameters
 ```{r}
+# SVM Train
+svm_fit <- svm_train(scale(as.matrix(trainx)), trainy, bestgamma, bestcost)
 
-
+# SVM Test
 svm_pred <- svm_test(svm_fit, scale(as.matrix(testx)))
+svm_pred <- ifelse(svm_pred > mean(svm_pred), 1, 0)
 
-svm.pred <- ifelse(svm_pred > mean(svm_pred), 1, 0)
-# Calculate Accuracy
-mean((svm.pred-testy)^2)
+# Conclude SVM
+# AUC
+svm.auc <- auc(testy, svm_pred)
+# Output SVM results
+cat("AUC for SVM is ", svm.auc, ".", sep = "")
+```
 
-confusionMatrix(factor(svm.pred), factor(testy))$byClass
 
+## Model 4: Neural Net
 
-weight_test <- rep(NA, length(testy))
-for (v in unique(testy)){
-  weight_test[testy == v] = 0.5 * length(testy) / length(testy[testy == v])
+```{r}
+# Define Function
+nnReg = function(train_df, hd){
+  set.seed(2020)
+  nn.fit = neuralnet(data = train_df,
+                     formula = factor(HEALTH) ~ . ,
+                     hidden = hd,
+                     threshold = 0.02,
+                     stepmax = 1e+04,
+                     algorithm = "rprop+",
+                     linear.output = F)
+  return(nn.fit)
 }
 
-
-library(WeightedROC)
-tpr.fpr <- WeightedROC(svm.pred, testy, weight_test)
-auc.svm <- WeightedAUC(tpr.fpr)
-auc.svm
-
-```
-
-
-
-## Neural Net
-
-```{r}
-
-nnfit = nnReg(datatrain)
-
-plot(nnfit)
-
 ```
 
 ```{r}
+# Preprocess data for neural net training
+nndata <- data.frame(
+  scale(as.matrix(trainx)), HEALTH = trainy)
 
-pred_nn = nnPred(nnfit, testx)
+# NN Train
+nnfit <- nnReg(nndata, hd = c(32, 16, 8, 4))
 
-confusionMatrix(factor(round(pred_nn)-1), factor(testy))$byClass
+# Trained NN plot
+plot(nnfit, rep = "best")         
+
+# NN Test
+pred_nn <- predict(nnfit, testx)
+nn.prediction <- round(pred_nn[ ,1])
+
+# Conclude NN
+# AUC
+nn.auc <- auc(testy, nn.prediction)
+# Output NN Results
+cat("AUC for NN is ", nn.auc, ".", sep = "")
+
 ```
-
-
-
-```{r}
-
-nbfit = nbReg(datatrain)
-
-nbpred = predict(nbfit, testx)
-
-mean((as.numeric(nbpred)-1 - testy)^2)
-
-confusionMatrix(nbpred, factor(testy))$byClass
-
-```
-
-
-
-
-
-
